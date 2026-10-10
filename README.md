@@ -19,11 +19,14 @@ python3 -m http.server 8000   # http://localhost:8000
 
 ## One-time VPS setup
 
+Get the certificate before enabling the site: the config references the cert files, so `nginx -t` fails without them. The config uses `listen 443 ssl http2;` because Ubuntu's nginx 1.24 doesn't know the newer `http2 on;` directive.
+
 ```bash
 sudo mkdir -p /var/www/harishraju.tech && sudo chown deploy:deploy /var/www/harishraju.tech
 git clone https://github.com/harisharaju1/portfolio-2026.git ~/projects/portfolio
 rsync -a --delete --exclude .git --exclude .github --exclude deploy --exclude README.md ~/projects/portfolio/ /var/www/harishraju.tech/
-sudo certbot certonly --nginx -d harishraju.tech -d www.harishraju.tech   # skip if the cert already exists
+sudo certbot certificates                                                  # skip the next line if harishraju.tech is listed
+sudo certbot certonly --nginx -d harishraju.tech -d www.harishraju.tech
 sudo cp ~/projects/portfolio/deploy/harishraju.tech.conf /etc/nginx/sites-available/
 sudo ln -sf /etc/nginx/sites-available/harishraju.tech.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
