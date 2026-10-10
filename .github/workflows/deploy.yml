@@ -23,3 +23,9 @@ jobs:
             rsync -a --delete \
               --exclude '.git' --exclude '.github' --exclude 'deploy' --exclude 'README.md' \
               ./ /var/www/harishraju.tech/
+            # Cache-bust: /assets/ is cached for 7 days, so stamp asset URLs with a
+            # hash of their contents. Changed CSS/JS gets a new URL; unchanged keeps it.
+            v=$(cat assets/style.css assets/theme.js | md5sum | cut -c1-8)
+            find /var/www/harishraju.tech -name '*.html' -exec sed -i \
+              -e "s#/assets/style.css\"#/assets/style.css?v=$v\"#" \
+              -e "s#/assets/theme.js\"#/assets/theme.js?v=$v\"#" {} +
