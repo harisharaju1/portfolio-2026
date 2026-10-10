@@ -17,21 +17,24 @@
 
   --measure: 44rem;
   --gutter: 1rem;
+
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #111214;
-    --surface: #18191c;
-    --text: #e8e8e6;
-    --muted: #a3a4a8;
-    --faint: #75767b;
-    --rule: #2a2b2f;
-    --accent: #5cc3ac;
-    --accent-soft: #15302a;
-    --warn: #e0b45c;
-    --warn-soft: #2d2513;
-  }
+/* Light is the default. Dark applies only when the visitor picks it (assets/theme.js). */
+:root[data-theme="dark"] {
+  --bg: #111214;
+  --surface: #18191c;
+  --text: #e8e8e6;
+  --muted: #a3a4a8;
+  --faint: #75767b;
+  --rule: #2a2b2f;
+  --accent: #5cc3ac;
+  --accent-soft: #15302a;
+  --warn: #e0b45c;
+  --warn-soft: #2d2513;
+
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -69,6 +72,20 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-
 .top .home { font-weight: 600; text-decoration: none; }
 .top nav { display: flex; gap: 1.25rem; color: var(--muted); }
 .top nav a { text-decoration: none; }
+.top .right { display: flex; align-items: center; gap: 1.25rem; }
+
+/* Hidden until theme.js runs, so it never shows as a dead button without JS. */
+.theme-toggle { display: none; }
+:root[data-theme] .theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; margin: -.4rem -.4rem -.4rem 0; padding: 0;
+  border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer;
+}
+.theme-toggle:hover { color: var(--accent); background: var(--surface); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-toggle svg { width: 1.05rem; height: 1.05rem; }
+.theme-toggle .moon, :root[data-theme="dark"] .theme-toggle .sun { display: block; }
+.theme-toggle .sun, :root[data-theme="dark"] .theme-toggle .moon { display: none; }
 
 /* ---------- type ---------- */
 
@@ -204,6 +221,7 @@ footer.site { border-top: 1px solid var(--rule); padding: 2rem 0 3rem; font-size
   .skills dd { margin-bottom: .6rem; }
   .flow .fork { grid-template-columns: 1fr 1fr; }
   .top nav { gap: .9rem; }
+  .top .right { gap: .9rem; }
   table { font-size: .8125rem; }
   td.num, th.num { padding-left: .5rem; }
   th, td { padding-right: .5rem; }
@@ -213,7 +231,7 @@ footer.site { border-top: 1px solid var(--rule); padding: 2rem 0 3rem; font-size
 
 @media print {
   :root { --bg: #fff; --text: #000; --muted: #333; --faint: #666; --rule: #ccc; --accent: #000; --accent-soft: #fff; --surface: #fff; }
-  .top nav, .skip, footer.site .built { display: none; }
+  .top nav, .theme-toggle, .skip, footer.site .built { display: none !important; }
   section { padding: 1.25rem 0; break-inside: avoid-page; }
   .project { break-inside: avoid; }
   a { text-decoration: none; }
