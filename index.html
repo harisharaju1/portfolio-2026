@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harish Raju · Senior Backend Engineer, AI Systems</title>
+<meta name="description" content="Senior backend engineer in Bengaluru with 8 years in C#/.NET and Node/TypeScript, now building production LLM services: agents, RAG, evals, cost tracking and failure isolation.">
+<link rel="canonical" href="https://harishraju.tech/">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbfbf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+
+<meta property="og:type" content="profile">
+<meta property="og:url" content="https://harishraju.tech/">
+<meta property="og:title" content="Harish Raju · Senior Backend Engineer, AI Systems">
+<meta property="og:description" content="Production LLM services with evals, fallbacks, cost tracking and failure isolation. Case studies with real numbers.">
+<meta property="og:image" content="https://harishraju.tech/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Harish Raju",
+  "url": "https://harishraju.tech/",
+  "jobTitle": "Senior Backend Engineer",
+  "address": { "@type": "PostalAddress", "addressLocality": "Bengaluru", "addressCountry": "IN" },
+  "knowsAbout": ["Backend engineering", "LLM applications", "AI agents", "LangGraph", "RAG", "LLM evaluation", "TypeScript", "Python", "C#", ".NET", "PostgreSQL", "AWS Bedrock", "Docker"],
+  "sameAs": ["https://github.com/harisharaju1", "https://www.linkedin.com/in/harish-raju"]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="wrap">
+  <header class="top">
+    <a class="home" href="/">Harish Raju</a>
+    <nav aria-label="Primary">
+      <a href="#work">Work</a>
+      <a href="#approach">Approach</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <section class="hero" aria-labelledby="name">
+      <div class="status"><span class="dot" aria-hidden="true"></span>Bengaluru · Open to Senior Backend and AI engineering roles</div>
+      <h1 id="name">Harish Raju</h1>
+      <p class="role">Senior Backend Engineer · production AI systems</p>
+      <p class="lede">I've spent eight years building backend systems in C#/.NET and Node/TypeScript. This year I've been building services that call LLMs, in TypeScript and Python. I care most about the engineering around the model call: evals that catch regressions, fallbacks when the model isn't sure, cost tracking for every request, and failures that stay contained.</p>
+      <div class="links">
+        <a href="https://github.com/harisharaju1">GitHub</a>
+        <a href="https://www.linkedin.com/in/harish-raju">LinkedIn</a>
+        <!-- <a href="mailto:you@example.com">Email</a> -->
+        <!-- <a href="/resume.pdf">Résumé (PDF)</a> -->
+      </div>
+    </section>
+
+    <section aria-labelledby="numbers">
+      <h2 id="numbers">2026 in numbers</h2>
+      <ul class="facts">
+        <li><span class="n">−86%</span><span class="d">Smaller first prompt for my code-review agent (397 KB → 54 KB). A triage step that makes no model calls drops docs, lockfiles and generated files before any agent sees the diff. <a href="/work/codereview-agent/#triage">How</a></span></li>
+        <li><span class="n">95→85%</span><span class="d">Drop in reasoning quality that my eval harness caught in a prompt meant as an improvement. That prompt was never promoted. <a href="/work/doctriage/#evals">The eval</a></span></li>
+        <li><span class="n">$1.29</span><span class="d">Cost to classify 1,000 insurance documents, measured per request and broken down by pipeline stage. Sonnet would cost about $3.90. <a href="/work/doctriage/#cost">Cost model</a></span></li>
+        <li><span class="n">26.9 s</span><span class="d">For three specialist agents to review a 26-file PR in parallel and return 10 code findings. A single agent took 27.7 s and returned 3, two of them about docs. <a href="/work/codereview-agent/#results">Results</a></span></li>
+      </ul>
+    </section>
+
+    <section id="work" aria-labelledby="work-h">
+      <h2 id="work-h">Selected work · 2026</h2>
+
+      <article class="project">
+        <header>
+          <h3>doctriage: AI triage for insurance claim documents</h3>
+          <span class="badge">Live</span>
+        </header>
+        <p class="what">Upload a claim PDF. The service extracts the text, classifies the document with Claude, sends low-confidence results to a human review queue, and indexes the content for retrieval.</p>
+        <ul>
+          <li><strong>Confidence gate:</strong> a classification below the threshold goes to a review queue and is never stored as trusted until a person resolves it.</li>
+          <li><strong>Versioned prompts and an eval harness:</strong> 20 hand-labelled fixtures, an LLM-as-judge on Bedrock, and pairwise comparisons run twice with positions swapped to cancel out position bias.</li>
+          <li><strong>Cost per request</strong>, broken down by pipeline stage on <code>/metrics</code>, including calls that failed.</li>
+          <li><strong>Three-layer prompt-injection defense</strong>, plus retries with backoff and a corrective retry when output fails schema validation.</li>
+        </ul>
+        <dl class="spec">
+          <dt>Stack</dt><dd>TypeScript · Fastify · Claude API · AWS Bedrock (Titan embeddings, judge) · Postgres + pgvector · Zod · Docker · GitHub Actions</dd>
+          <dt>When</dt><dd>May – Jul 2026 · 98 tests · self-hosted on my VPS</dd>
+        </dl>
+        <div class="actions">
+          <a href="/work/doctriage/">Case study</a>
+          <a href="https://doctriage.harishraju.tech">Live demo</a>
+          <a href="https://github.com/harisharaju1/doctriage">Code</a>
+        </div>
+      </article>
+
+      <article class="project">
+        <header>
+          <h3>codereview-agent: multi-agent pull request reviewer</h3>
+          <span class="badge wip">In progress · week 3 of 4</span>
+        </header>
+        <p class="what">A GitHub App that reviews pull requests. Specialist agents investigate the code with real tools and return typed, ranked findings with the cost of each review.</p>
+        <ul>
+          <li><strong>Built the agent loop by hand first:</strong> five tools (file reads, code search, dependency checks, and linting in three languages), then ported it to LangGraph with parity tests.</li>
+          <li><strong>Multi-agent workflow:</strong> triage with no model calls, then security, performance, correctness and dependency specialists in parallel, then a deterministic merge.</li>
+          <li><strong>Failure isolation:</strong> if one specialist times out, the review still comes back from the others, marked as partial.</li>
+          <li><strong>A docs-only PR now costs $0.00</strong> and takes 2.2 s. Before triage, it took 5 model calls and $0.02.</li>
+        </ul>
+        <dl class="spec">
+          <dt>Stack</dt><dd>Python 3.12 · FastAPI · LangGraph · Claude API (tool use) · GitHub App auth · Pydantic · pytest + respx</dd>
+          <dt>When</dt><dd>Aug 2026 – now · 133 tests · next: Postgres checkpoints, SQS worker, MCP server</dd>
+        </dl>
+        <div class="actions">
+          <a href="/work/codereview-agent/">Case study</a>
+          <a href="https://github.com/harisharaju1/codereview-agent">Code</a>
+        </div>
+      </article>
+
+      <article class="project">
+        <header>
+          <h3>DJewel Boutique: jewellery storefront</h3>
+          <span class="badge">Live</span>
+        </header>
+        <p class="what">An e-commerce site with checkout, custom-order requests, wishlists and an admin panel.</p>
+        <ul>
+          <li><strong>Payments verified on the server:</strong> Razorpay signatures are checked with HMAC-SHA256 in a Supabase Edge Function, so the browser can't claim a payment succeeded.</li>
+          <li><strong>Postgres row-level security</strong> on every table customers touch. Order confirmation emails go out from an Edge Function.</li>
+          <li><strong>Cursor-based pagination</strong> (no <code>OFFSET</code> scans) and stale-while-revalidate caching for the catalogue.</li>
+        </ul>
+        <dl class="spec">
+          <dt>Stack</dt><dd>React 18 · TypeScript · Vite · Supabase (Postgres, Auth, RLS, Edge Functions) · Razorpay · Resend · Vercel</dd>
+          <dt>When</dt><dd>Jan – Apr 2026</dd>
+        </dl>
+        <div class="actions">
+          <a href="https://digitaljems.vercel.app">Live site</a>
+          <a href="https://github.com/harisharaju1/digitaljems">Code</a>
+        </div>
+      </article>
+
+      <article class="project">
+        <header>
+          <h3>A small mobile robot with swappable grippers</h3>
+          <span class="badge wip">Building</span>
+        </header>
+        <p class="what">A 250 mm differential-drive base with a two-finger gripper and a vacuum gripper that swap on and off. Built outside work to learn embedded systems and ROS 2.</p>
+        <ul>
+          <li><strong>ESP32-S3 running micro-ROS</strong> for motor control, a Raspberry Pi 5 running ROS 2, and an RPLIDAR C1.</li>
+          <li><strong>Parametric CAD in Python (CadQuery):</strong> every dimension lives in one file. Tolerance coupons get printed and measured first, before parts are ordered.</li>
+        </ul>
+        <dl class="spec">
+          <dt>Stack</dt><dd>CadQuery · ESP32-S3 · micro-ROS · ROS 2 · Raspberry Pi 5</dd>
+          <dt>When</dt><dd>Oct 2026 – now</dd>
+        </dl>
+        <div class="actions">
+          <a href="https://github.com/harisharaju1/handheld-robotics-v1">Code</a>
+        </div>
+      </article>
+    </section>
+
+    <!--
+      Experience goes here. Suggested shape, newest first:
+
+    <section id="experience" aria-labelledby="exp-h">
+      <h2 id="exp-h">Experience</h2>
+      <article class="project">
+        <header><h3>Senior Software Engineer · Company</h3><span class="mono muted">2022 – now</span></header>
+        <ul>
+          <li>Outcome with a number (latency, cost, scale, users).</li>
+        </ul>
+      </article>
+    </section>
+    -->
+
+    <section id="approach" aria-labelledby="approach-h">
+      <h2 id="approach-h">How I work</h2>
+      <ol class="principles">
+        <li><div><strong>Measure before I claim.</strong><p>I estimated a multi-agent review would cost $0.15–0.40. The real run cost $0.417, and the write-up says so, along with where the tokens went.</p></div></li>
+        <li><div><strong>Build it by hand before I reach for a framework.</strong><p>I wrote the raw tool-use loop before LangGraph, and my own retry utility before any library. That way I know what a framework is doing for me, and what it hides.</p></div></li>
+        <li><div><strong>Validate every boundary.</strong><p>Every LLM response and external API payload goes through Zod or Pydantic before anything uses it. Shape errors fail loudly at the edge.</p></div></li>
+        <li><div><strong>Write down the decision and the alternative.</strong><p>Each project has dated design notes: what I chose, what I rejected, and where I changed course from the plan.</p></div></li>
+        <li><div><strong>Mocks prove the logic, and real calls prove the integration.</strong><p>Two bugs only appeared against the live API, including a model ID with a date suffix that broke an exact-match price lookup. I keep a few paid end-to-end runs for that reason.</p></div></li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="skills-h">
+      <h2 id="skills-h">Tools I use</h2>
+      <dl class="skills">
+        <dt>Languages</dt><dd>TypeScript, Python, C#</dd>
+        <dt>Backend</dt><dd>Node.js (Fastify), FastAPI, .NET, REST, GitHub Apps and webhooks</dd>
+        <dt>AI / LLM</dt><dd>Claude API tool use, LangGraph, RAG with pgvector, eval harnesses and LLM-as-judge, prompt versioning, token cost accounting</dd>
+        <dt>Data</dt><dd>PostgreSQL, pgvector, MongoDB, Redis, Supabase</dd>
+        <dt>Cloud &amp; ops</dt><dd>AWS (Bedrock), Docker Compose, Nginx, Let's Encrypt, GitHub Actions, a self-managed Linux VPS</dd>
+        <dt>Testing</dt><dd>Vitest, pytest, respx, Playwright</dd>
+      </dl>
+    </section>
+
+    <section id="contact" aria-labelledby="contact-h">
+      <h2 id="contact-h">Contact</h2>
+      <p>The best way to reach me is a message on <a href="https://www.linkedin.com/in/harish-raju">LinkedIn</a>. My code is on <a href="https://github.com/harisharaju1">GitHub</a>.</p>
+    </section>
+
+  </main>
+
+  <footer class="site">
+    <span>© 2026 Harish Raju</span>
+    <span class="built">Plain HTML and CSS, served by Nginx from a VPS I run.</span>
+  </footer>
+</div>
+</body>
+</html>

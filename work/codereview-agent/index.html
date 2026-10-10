@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>codereview-agent case study · Harish Raju</title>
+<meta name="description" content="A GitHub App that reviews pull requests with parallel LangGraph specialist agents: no-LLM triage, per-agent tool subsets and budgets, failure isolation, and measured cost per review.">
+<link rel="canonical" href="https://harishraju.tech/work/codereview-agent/">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://harishraju.tech/work/codereview-agent/">
+<meta property="og:title" content="codereview-agent: a multi-agent pull request reviewer">
+<meta property="og:description" content="From a hand-written tool-use loop to parallel LangGraph specialists, with every run's cost measured.">
+<meta property="og:image" content="https://harishraju.tech/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="top">
+    <a class="home" href="/">Harish Raju</a>
+    <nav aria-label="Primary">
+      <a href="/#work">Work</a>
+      <a href="/#approach">Approach</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="crumb"><a href="/#work">Work</a> / codereview-agent</div>
+    <section class="cs-head" aria-labelledby="t">
+      <h1 id="t">codereview-agent</h1>
+      <p class="role">A GitHub App that reviews pull requests with agents that investigate the code instead of skimming the diff.</p>
+      <dl class="spec">
+        <dt>Status</dt><dd>In progress: week 3 of 4. The review engine works end to end against real PRs.</dd>
+        <dt>Role</dt><dd>Sole engineer</dd>
+        <dt>When</dt><dd>Aug 2026 – now</dd>
+        <dt>Stack</dt><dd>Python 3.12 · FastAPI · LangGraph · Anthropic SDK (tool use, Claude Haiku 4.5) · GitHub App (JWT + installation tokens) · Pydantic · httpx · unidiff · ruff / oxlint / dotnet format · pytest + respx · Docker</dd>
+        <dt>Size</dt><dd>~4,200 lines of source · 133 tests</dd>
+      </dl>
+      <div class="actions">
+        <a href="https://github.com/harisharaju1/codereview-agent">Code</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="path">
+      <h2 id="path">How it got here</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Stage</th><th>What was built</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">Week 1</td><td>FastAPI service structured as routers, services and schemas, with dependency injection. GitHub App install flow: the App's private key signs a JWT, which is exchanged for short-lived installation tokens cached server-side. The browser only holds a signed, opaque installation ID.</td></tr>
+            <tr><td class="mono">Week 2</td><td>A hand-written tool-use loop with five tools: <code>get_file_content</code>, <code>search_codebase</code>, <code>check_dependency_versions</code> (Python, npm and NuGet manifests), <code>run_linter</code> (ruff, oxlint, dotnet format) and <code>submit_review</code>, which validates its output and feeds errors back to the model. Each run reports its token cost, including runs that fail.</td></tr>
+            <tr><td class="mono">Week 3 · 1</td><td>A port of the loop to LangGraph that matches its behavior, selectable per request with <code>?engine=</code> and kept equivalent by parity tests. The final iteration forces <code>submit_review</code>, so a run that hits its budget still returns a review.</td></tr>
+            <tr><td class="mono">Week 3 · 2</td><td>The multi-agent workflow below: triage, parallel specialists, synthesis.</td></tr>
+            <tr><td class="mono">Next</td><td>An eval with a seeded-bug PR to measure recall. Then durable, asynchronous reviews: <code>202 Accepted</code>, an SQS worker, LangGraph checkpoints in Postgres so a crashed review resumes instead of being paid for twice, an MCP server, and deployment to the VPS.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="arch">
+      <h2 id="arch">The workflow</h2>
+      <div class="flow" role="img" aria-label="Workflow: fetch PR context, then triage with no model calls, then up to four specialists in parallel (security, performance, correctness, dependencies), each with its own tools and budget, then a deterministic synthesis step. A docs-only PR skips straight to synthesis.">
+        <div class="step"><b>fetch_context</b><span>PR metadata + diff · GitHub API</span></div>
+        <div class="arrow"></div>
+        <div class="step accent"><b>triage</b><span>no LLM · parse, skip, trim</span></div>
+        <div class="arrow"><em>Send × N, same super-step · docs-only → straight to synthesize</em></div>
+        <div class="fork" style="--n:4">
+          <div class="step"><b>security</b><span>files, search · 5 turns</span></div>
+          <div class="step"><b>performance</b><span>files, search · 4 turns</span></div>
+          <div class="step"><b>correctness</b><span>files, linter, search · 6</span></div>
+          <div class="step"><b>dependencies</b><span>versions · 3 turns</span></div>
+        </div>
+        <div class="arrow"></div>
+        <div class="step"><b>synthesize</b><span>dedupe · rank · cap 50</span></div>
+      </div>
+      <p class="caption">Each specialist runs as its own compiled subgraph with its own conversation. Only its findings and token counts come back to the parent. Every specialist sees the full file inventory but only its own files' diffs.</p>
+    </section>
+
+    <section id="triage" aria-labelledby="triage-h">
+      <h2 id="triage-h">Triage: cut the input before paying for it</h2>
+      <div class="prose">
+        <p>The first real run re-sent a 397 KB diff on every iteration, about 114k input tokens per call. Most of it was Markdown. The model then reviewed the docs and reported their contents as defects. Triage parses the diff with <code>unidiff</code> and skips files in this order: deleted, binary, lockfile, vendored, generated, documentation. It caps each remaining file's diff at 400 lines, with a pointer to <code>get_file_content</code> for the rest.</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>PR</th><th class="num">Files</th><th class="num">Reviewable</th><th class="num">Diff in</th><th class="num">Diff out</th></tr></thead>
+          <tbody>
+            <tr><td>#1 · large</td><td class="num">26</td><td class="num">13</td><td class="num">397 KB</td><td class="num">54 KB (−86%)</td></tr>
+            <tr><td>#2 · README</td><td class="num">1</td><td class="num">0</td><td class="num">339 B</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <p>PR #2 now returns in 2.2 s with zero requests to the model API. The old loop took 5 model calls and $0.02 to reach the same answer. One judgement call: <code>.txt</code> is <em>not</em> treated as documentation, because skipping <code>requirements.txt</code> costs review coverage, while reviewing a notes file costs only a few cents.</p>
+      </div>
+    </section>
+
+    <section id="results" aria-labelledby="results-h">
+      <h2 id="results-h">Single loop vs workflow, same PR</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>PR #1 · Claude Haiku 4.5</th><th class="num">Loop</th><th class="num">Workflow</th></tr></thead>
+          <tbody>
+            <tr><td>Findings</td><td class="num">3</td><td class="num">10</td></tr>
+            <tr><td>Findings about code (not docs)</td><td class="num">1 of 3</td><td class="num">10 of 10</td></tr>
+            <tr><td>Model calls</td><td class="num">3</td><td class="num">15</td></tr>
+            <tr><td>Input / output tokens</td><td class="num">342k / 1.8k</td><td class="num">399k / 3.5k</td></tr>
+            <tr><td>Cost</td><td class="num">$0.351</td><td class="num">$0.417</td></tr>
+            <tr><td>Wall-clock time</td><td class="num">27.7 s</td><td class="num">26.9 s</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <p><strong>The workflow cost more, not less, and my estimate ($0.15–0.40) was low.</strong> A fair comparison is $0.35 for a shallow review of the docs against $0.42 for a review of the code with about five times as many model calls, in the same time. The three specialists started within 3 ms of each other. Most of the input tokens were re-sent conversation history, which is what prompt caching discounts, so that's the next cost experiment.</p>
+        <p><strong>Finding quality, assessed honestly:</strong> 4–5 of the 10 were useful, 3 were theoretical, and 2 were false positives caused by my own linter tool. It runs ruff with <code>--isolated</code>, so ruff flagged import order it couldn't resolve. The fix is to lint with the reviewed repo's own config. A seeded-bug PR comes next, so "useful" becomes a measured recall number rather than my judgement.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="decisions">
+      <h2 id="decisions">Decisions and tradeoffs</h2>
+
+      <div class="decision">
+        <h3>Split by concern, not by file</h3>
+        <p>About four specialist runs per review, whatever the PR size, and reasoning across files stays inside each concern. If a very large PR ever needs file-group chunking, that's a change to the router function alone.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Isolate failures inside the node, after testing the framework's own option</h3>
+        <p>I tested LangGraph's <code>error_handler</code> in throwaway scripts. It fires for nodes reached by a normal edge, but not for tasks started with <code>Send</code>, which is how specialists fan out (v1.2.12). So each specialist wraps its run in <code>asyncio.timeout</code> plus a narrow <code>try/except</code> that records <code>timed_out</code> or <code>failed</code> and lets the rest of the review complete.</p>
+        <p class="alt">Rejected: a catch-all <code>except Exception</code>, which would turn real bugs into quietly incomplete reviews.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Retries in exactly one layer</h3>
+        <p>Anthropic calls retry inside the SDK, and GitHub calls through my own <code>call_with_retry</code>. There's no LangGraph <code>retry_policy</code> on top, because a node-level retry would re-run, and re-pay for, an entire specialist. Stacking retry layers multiplies the attempts.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Reject tool arguments the model invented</h3>
+        <p>In a real run, the model called <code>get_file_content</code> with a <code>lines</code> argument that doesn't exist. The executor ignored it and returned the whole file without telling the model. Tool calls are now checked against the schema the model was shown, and against that agent's allowed tools. Unknown arguments come back as an error the model can correct.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Build the loop by hand first, then port it to LangGraph without changing behavior</h3>
+        <p>Porting the loop exactly, with parity tests, made the LangGraph comparison like for like. Only after that did the graph get restructured into something a single loop can't do well: fan-out with isolated context per agent and checkpointing per subgraph. I confirmed checkpointing writes 22 checkpoints across five namespaces in one run, so a crash can resume inside a half-finished specialist.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="bugs">
+      <h2 id="bugs">Bugs that mocks couldn't catch</h2>
+      <div class="prose">
+        <ul>
+          <li><strong>Pricing lookup by exact model name.</strong> Real responses echo a model ID with a date suffix (<code>claude-haiku-4-5-20251001</code>), which no mock reproduced. Without the fix, cost tracking would have silently failed in production.</li>
+          <li><strong><code>dotnet format analyzers</code></strong> didn't catch what plain <code>dotnet format</code> catches. I only found this by running the command.</li>
+          <li><strong>A test fixture serving JSON as "the diff".</strong> <code>respx</code> matches the first route registered, and the metadata route (same URL, different <code>Accept</code> header) was registered first. Every week 2 test had been sending JSON to the fake model, which was invisible until triage actually parsed the diff.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <span><a href="/work/doctriage/">← doctriage</a></span>
+    <span><a href="/">All work →</a></span>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://harishraju.tech/sitemap.xml

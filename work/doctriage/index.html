@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>doctriage case study · Harish Raju</title>
+<meta name="description" content="An LLM document triage service for insurance claims: confidence-gated human review, versioned prompts with an eval harness, per-request cost tracking and layered prompt-injection defense.">
+<link rel="canonical" href="https://harishraju.tech/work/doctriage/">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://harishraju.tech/work/doctriage/">
+<meta property="og:title" content="doctriage: AI triage for insurance claim documents">
+<meta property="og:description" content="Confidence-gated human review, an eval harness that caught a regression, and $1.29 per 1,000 documents.">
+<meta property="og:image" content="https://harishraju.tech/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="top">
+    <a class="home" href="/">Harish Raju</a>
+    <nav aria-label="Primary">
+      <a href="/#work">Work</a>
+      <a href="/#approach">Approach</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="crumb"><a href="/#work">Work</a> / doctriage</div>
+    <section class="cs-head" aria-labelledby="t">
+      <h1 id="t">doctriage</h1>
+      <p class="role">An LLM service that classifies insurance claim documents, and knows when to ask a person.</p>
+      <dl class="spec">
+        <dt>Role</dt><dd>Sole engineer: design, build, tests, deploy</dd>
+        <dt>When</dt><dd>May – Jul 2026, 4 weeks of build</dd>
+        <dt>Stack</dt><dd>TypeScript · Fastify · Claude Haiku 4.5 (Anthropic API) · AWS Bedrock (Titan Embeddings V2, Claude judge) · Postgres + pgvector · Zod · pino · Docker Compose · Nginx · GitHub Actions</dd>
+        <dt>Size</dt><dd>~3,900 lines of source · 98 tests, none needing real credentials</dd>
+      </dl>
+      <div class="actions">
+        <a href="https://doctriage.harishraju.tech">Live demo</a>
+        <a href="https://github.com/harisharaju1/doctriage">Code</a>
+      </div>
+    </section>
+
+    <section aria-labelledby="problem">
+      <h2 id="problem">The problem</h2>
+      <div class="prose">
+        <p>Insurance claims arrive as PDFs: claim forms, medical reports, police reports, repair estimates. Each one has to be identified before it can be routed. An LLM can do that well most of the time. The engineering problem is the rest of the time: the model is unsure, times out, returns malformed JSON, or reads a document that has been written to manipulate it.</p>
+        <p>So the goal wasn't a chatbot wrapper. It was a backend service that treats the model as an unreliable upstream dependency and still produces results the business can trust.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="arch">
+      <h2 id="arch">Request pipeline</h2>
+      <div class="flow" role="img" aria-label="Pipeline: upload PDF, extract text, classify with Claude Haiku using tool use, check confidence against a threshold. Below threshold goes to a human review queue; at or above is persisted. Persisted documents are chunked, embedded with Bedrock Titan, stored in pgvector, and queried by cosine distance.">
+        <div class="step"><b>POST /documents</b><span>PDF upload · type + size checks</span></div>
+        <div class="arrow"></div>
+        <div class="step"><b>Text extraction</b><span>unpdf · typed failure, not a 500</span></div>
+        <div class="arrow"></div>
+        <div class="step"><b>Classify</b><span>Haiku 4.5 · tool use · Zod</span></div>
+        <div class="arrow"><em>invalid schema → one corrective retry</em></div>
+        <div class="step accent"><b>Confidence ≥ 0.7?</b><span>configurable threshold</span></div>
+        <div class="arrow"></div>
+        <div class="fork">
+          <div class="step"><b>No → review queue</b><span>not stored as trusted; a person resolves it</span></div>
+          <div class="step"><b>Yes → persisted</b><span>prompt version logged</span></div>
+        </div>
+        <div class="arrow"></div>
+        <div class="step"><b>Chunk + embed</b><span>Bedrock Titan V2</span></div>
+        <div class="arrow"></div>
+        <div class="step"><b>pgvector retrieval</b><span>cosine distance · per document</span></div>
+      </div>
+      <p class="caption">Every external call has retry with backoff, a timeout, a logger bound to the document ID, and a cost entry, whether the call succeeded, was queued for review, or failed.</p>
+    </section>
+
+    <section aria-labelledby="decisions">
+      <h2 id="decisions">Decisions and tradeoffs</h2>
+
+      <div class="decision">
+        <h3>A confidence gate, not "trust every valid response"</h3>
+        <p>Through week 2, any schema-valid classification was stored. But passing schema validation and being trustworthy are different things. Results below <code>CLASSIFICATION_CONFIDENCE_THRESHOLD</code> (0.7) now go to a review queue and stay out of the document record until a person resolves them. That way the stored field only ever means "trusted".</p>
+        <p class="alt">Honest caveat: 0.7 is a starting point, not a measured value. The next experiment is to label results across the confidence range and see where accuracy actually drops.</p>
+      </div>
+
+      <div class="decision">
+        <h3>pgvector instead of a dedicated vector database</h3>
+        <p>Postgres was already running for workflow state. Adding pgvector meant no fourth database on one VPS, and it allows hybrid queries: a relational <code>WHERE</code> clause and vector similarity in one statement, such as "relevant chunks from open claims filed in the last 30 days".</p>
+        <p class="alt">Rejected: MongoDB vector search, which needs managed Atlas and doesn't work on self-hosted <code>mongo:7</code>. Accepted: pgvector's ANN indexing is less mature at very large scale, which doesn't matter at this size.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Separate classify, embed and query endpoints</h3>
+        <p>Extraction is local and free. Classification and embedding are paid, rate-limited external calls. Bundling them would make an upload fail whenever the LLM was down. Keeping them separate also lets the eval harness re-run classification alone when a prompt changes, without re-embedding anything.</p>
+        <p class="alt">The production version of "process this document" is a queue and a worker. I left that out on purpose, because this project was about getting synchronous LLM-call patterns right first.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Haiku over Sonnet, with the missing half of the argument stated</h3>
+        <p>Sonnet costs 3× as much as Haiku per token. Cost alone doesn't justify a model choice, though. The full answer is that Sonnet costs 3× more, its accuracy advantage on this task hasn't been measured yet, and measuring it is cheap.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Three layers of prompt-injection defense</h3>
+        <p>Each document is untrusted input that gets read verbatim into a prompt. The defenses are independent: (1) prompt v3 tells the model that anything inside <code>&lt;document&gt;</code> is data, never instructions; (2) <code>sanitizeForPrompt</code> neutralizes fake turn markers and common injection phrasing before the text reaches any prompt, including the judge's; (3) Zod rejects any output that breaks the contract. An attack has to beat all three.</p>
+        <p class="alt">v3 became the default immediately as a security fix. Accuracy changes go through the eval harness first, as described below.</p>
+      </div>
+
+      <div class="decision">
+        <h3>Correlation IDs threaded through the call graph</h3>
+        <p>Each route creates <code>request.log.child({ documentId })</code> once and passes it into every service call. That replaced separate per-module loggers, so a document's full path through the pipeline can be found with one grep, even with concurrent requests.</p>
+      </div>
+    </section>
+
+    <section id="evals" aria-labelledby="evals-h">
+      <h2 id="evals-h">The eval that stopped a prompt change</h2>
+      <div class="prose">
+        <p>Prompts are versioned files resolved through a registry, and every classification logs which version produced it. <code>pnpm eval</code> runs 20 hand-written fixtures through two prompt versions and scores them in three ways: exact match on document type, a confidence-band check, and an LLM judge on Bedrock for the free-text reasoning. The fixtures are deliberately written by hand, because LLM-generated ground truth would just grade the model against another model's opinion.</p>
+        <p>Prompt v2 was meant to improve confidence calibration. Here is what the harness reported:</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Metric (20 fixtures)</th><th class="num">v1</th><th class="num">v2</th></tr></thead>
+          <tbody>
+            <tr><td>Document type, exact match</td><td class="num">100%</td><td class="num">100%</td></tr>
+            <tr><td>Confidence in expected band</td><td class="num">70%</td><td class="num">75%</td></tr>
+            <tr><td>Reasoning passes judge</td><td class="num">95%</td><td class="num">85%</td></tr>
+            <tr><td>Pairwise wins (ties 8, inconclusive 3)</td><td class="num">4</td><td class="num">5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <p>v2 calibrated slightly better but reasoned worse, so it wasn't promoted. The pairwise judge runs each comparison twice with v1 and v2 swapped. If it picks different winners, the result is recorded as <em>inconclusive</em> rather than counted, so position bias can't decide the outcome. Every run is saved as a timestamped JSON file, so the next prompt change has a baseline to compare against.</p>
+      </div>
+    </section>
+
+    <section id="cost" aria-labelledby="cost-h">
+      <h2 id="cost-h">Cost, measured per request</h2>
+      <div class="prose">
+        <p>Each classification, embedding and judge call records its token usage and cost. Failed calls are recorded too, because they're still billed. <code>GET /metrics</code> returns totals and a breakdown by pipeline stage. Prices are checked against the official Anthropic and Bedrock pricing pages, with the check date noted in the source.</p>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Classification</th><th class="num">Per document</th><th class="num">Per 1,000</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Haiku 4.5 (measured)</td><td class="num">$0.001292</td><td class="num">$1.29</td></tr>
+            <tr><td>Claude Sonnet (same tokens, 3× price)</td><td class="num">~$0.0039</td><td class="num">~$3.90</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="ops">
+      <h2 id="ops">Running it</h2>
+      <div class="prose">
+        <ul>
+          <li>Docker Compose on a VPS I manage, behind Nginx with auto-renewing Let's Encrypt certificates. The app port isn't reachable from outside the machine.</li>
+          <li>A push to <code>main</code> deploys through GitHub Actions over SSH.</li>
+          <li>A cron job on the VPS polls <code>/health</code> and sends a webhook alert if it fails.</li>
+          <li>The full test suite runs with no API keys: every external dependency has an in-memory or mocked implementation behind a repository interface.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section aria-labelledby="limits">
+      <h2 id="limits">Known limitations</h2>
+      <div class="prose">
+        <ul>
+          <li><code>/health</code> shows that the process is up, not that Postgres is reachable. A dependency-aware check is the next fix.</li>
+          <li><code>GET /documents/:id</code> can't yet tell "never classified" apart from "waiting for human review". This was a known tradeoff when the review queue was added.</li>
+          <li>The current default prompt, v3, still needs its own eval run to confirm the security change didn't cost accuracy.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <span><a href="/">← All work</a></span>
+    <span><a href="/work/codereview-agent/">Next: codereview-agent →</a></span>
+  </footer>
+</div>
+</body>
+</html>
