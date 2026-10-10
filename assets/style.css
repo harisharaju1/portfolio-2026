@@ -186,6 +186,7 @@ td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numer
 .flow .arrow::after { content: ""; position: absolute; left: calc(1.25rem - 3px); bottom: 0; border: 3px solid transparent; border-top-color: var(--faint); border-bottom: 0; }
 .flow .arrow em { position: absolute; left: 2rem; top: .1rem; font-style: normal; font-family: var(--mono); font-size: .6875rem; color: var(--faint); }
 .flow .fork { display: grid; grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr)); gap: .5rem; }
+.flow .fork.four { --n: 4; }
 .flow .fork .step { grid-template-columns: 1fr; gap: .15rem; }
 .flow .fork .step span { text-align: left; }
 
