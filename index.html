@@ -85,10 +85,10 @@
 
       <article class="project">
         <header>
-          <h3>doctriage: AI triage for insurance claim documents</h3>
+          <h3>doctriage: AI document triage that knows when to ask a person</h3>
           <span class="badge">Live</span>
         </header>
-        <p class="what">Upload a claim PDF. The service extracts the text, classifies the document with Claude, sends low-confidence results to a human review queue, and indexes the content for retrieval.</p>
+        <p class="what">Upload a PDF. The service extracts the text, classifies the document with Claude, sends low-confidence results to a human review queue, and indexes the content for retrieval. Demonstrated on insurance claims; the pipeline is domain-agnostic.</p>
         <ul>
           <li><strong>Confidence gate:</strong> a classification below the threshold goes to a review queue and is never stored as trusted until a person resolves it.</li>
           <li><strong>Versioned prompts and an eval harness:</strong> 20 hand-labelled fixtures, an LLM-as-judge on Bedrock, and pairwise comparisons run twice with positions swapped to cancel out position bias.</li>
@@ -97,7 +97,7 @@
         </ul>
         <dl class="spec">
           <dt>Stack</dt><dd>TypeScript · Fastify · Claude API · AWS Bedrock (Titan embeddings, judge) · Postgres + pgvector · Zod · Docker · GitHub Actions</dd>
-          <dt>When</dt><dd>May – Jul 2026 · 98 tests · self-hosted on my VPS</dd>
+          <dt>When</dt><dd>May – Jul 2026 · 106 tests · self-hosted on my VPS</dd>
         </dl>
         <div class="actions">
           <a href="/work/doctriage/">Case study</a>

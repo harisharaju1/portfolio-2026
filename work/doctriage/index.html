@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>doctriage case study · Harish Raju</title>
-<meta name="description" content="An LLM document triage service for insurance claims: confidence-gated human review, versioned prompts with an eval harness, per-request cost tracking and layered prompt-injection defense.">
+<meta name="description" content="An LLM document triage service, demonstrated on insurance claims: confidence-gated human review, versioned prompts with an eval harness, per-request cost tracking and layered prompt-injection defense.">
 <link rel="canonical" href="https://harishraju.tech/work/doctriage/">
 <meta name="color-scheme" content="light">
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://harishraju.tech/work/doctriage/">
-<meta property="og:title" content="doctriage: AI triage for insurance claim documents">
+<meta property="og:title" content="doctriage: AI document triage that knows when to ask a person">
 <meta property="og:description" content="Confidence-gated human review, an eval harness that caught a regression, and $1.29 per 1,000 documents.">
 <meta property="og:image" content="https://harishraju.tech/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -39,12 +39,12 @@
     <div class="crumb"><a href="/#work">Work</a> / doctriage</div>
     <section class="cs-head" aria-labelledby="t">
       <h1 id="t">doctriage</h1>
-      <p class="role">An LLM service that classifies insurance claim documents, and knows when to ask a person.</p>
+      <p class="role">An LLM service that sorts incoming documents, and knows when to ask a person. Demonstrated on insurance claims.</p>
       <dl class="spec">
         <dt>Role</dt><dd>Sole engineer: design, build, tests, deploy</dd>
         <dt>When</dt><dd>May – Jul 2026, 4 weeks of build</dd>
         <dt>Stack</dt><dd>TypeScript · Fastify · Claude Haiku 4.5 (Anthropic API) · AWS Bedrock (Titan Embeddings V2, Claude judge) · Postgres + pgvector · Zod · pino · Docker Compose · Nginx · GitHub Actions</dd>
-        <dt>Size</dt><dd>~3,900 lines of source · 98 tests, none needing real credentials</dd>
+        <dt>Size</dt><dd>~3,700 lines of TypeScript · 106 tests, none needing real credentials</dd>
       </dl>
       <div class="actions">
         <a href="https://doctriage.harishraju.tech" target="_blank" rel="noopener noreferrer">Live demo</a>
@@ -55,7 +55,8 @@
     <section aria-labelledby="problem">
       <h2 id="problem">The problem</h2>
       <div class="prose">
-        <p>Insurance claims arrive as PDFs: claim forms, medical reports, police reports, repair estimates. Each one has to be identified before it can be routed. An LLM can do that well most of the time. The engineering problem is the rest of the time: the model is unsure, times out, returns malformed JSON, or reads a document that has been written to manipulate it.</p>
+        <p>Insurers, banks, hospitals, HR and legal teams all receive mixed PDFs, and each one has to be identified before it can be routed. I built doctriage around insurance claims (claim forms, medical reports, police reports, repair estimates), but only three things are specific to that domain: the list of document types, the prompt, and the eval fixtures. The pipeline itself would sort loan files or hospital bills unchanged.</p>
+        <p>An LLM can identify a document well most of the time. The engineering problem is the rest of the time: the model is unsure, times out, returns malformed JSON, or reads a document that has been written to manipulate it.</p>
         <p>So the goal wasn't a chatbot wrapper. It was a backend service that treats the model as an unreliable upstream dependency and still produces results the business can trust.</p>
       </div>
     </section>
