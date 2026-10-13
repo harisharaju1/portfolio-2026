@@ -44,7 +44,7 @@
         <dt>Role</dt><dd>Sole engineer: design, build, tests, deploy</dd>
         <dt>When</dt><dd>May – Jul 2026, 4 weeks of build</dd>
         <dt>Stack</dt><dd>TypeScript · Fastify · Claude Haiku 4.5 (Anthropic API) · AWS Bedrock (Titan Embeddings V2, Claude judge) · Postgres + pgvector · Zod · pino · Docker Compose · Nginx · GitHub Actions</dd>
-        <dt>Size</dt><dd>~3,700 lines of TypeScript · 106 tests, none needing real credentials</dd>
+        <dt>Size</dt><dd>~3,800 lines of TypeScript · 118 tests, none needing real credentials</dd>
       </dl>
       <div class="actions">
         <a href="https://doctriage.harishraju.tech" target="_blank" rel="noopener noreferrer">Live demo</a>
@@ -164,7 +164,8 @@
       <h2 id="ops">Running it</h2>
       <div class="prose">
         <ul>
-          <li>Docker Compose on a VPS I manage, behind Nginx with auto-renewing Let's Encrypt certificates. The app port isn't reachable from outside the machine.</li>
+          <li>Docker Compose on a VPS I manage, behind Nginx with auto-renewing Let's Encrypt certificates. The app port is bound to loopback, so Nginx is the only way in.</li>
+          <li>The public demo makes paid model calls, so it has three server-side guards: a per-IP rate limit, a 5,000-word cap on uploads, and a daily spend ceiling that pauses paid routes with a 503.</li>
           <li>A push to <code>main</code> deploys through GitHub Actions over SSH.</li>
           <li>A cron job on the VPS polls <code>/health</code> and sends a webhook alert if it fails.</li>
           <li>The full test suite runs with no API keys: every external dependency has an in-memory or mocked implementation behind a repository interface.</li>
